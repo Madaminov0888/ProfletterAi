@@ -31,37 +31,46 @@ class AgentOrchestrator(
     private val overlapAgent: OverlapAnalysisAgent
 ) {
 
-    private val parallelAgents: List<ResearchAgent> = listOf(
-        recommenderAgent, studentAgent, targetAgent, institutionAgent
-    )
-
     private val _statuses = MutableStateFlow(initialStatuses())
     val statuses: StateFlow<List<AgentStatus>> = _statuses
 
     /**
      * Kicks off all parallel agents at once, then runs the overlap synthesizer
      * once they all return. Status flow is updated as each agent transitions.
+     *
+     * If [UserInput.cachedRecommenderProfile] is provided (the user picked a
+     * saved profile on the Generate tab), the Recommender Profile Agent is
+     * skipped and its status flips directly to DONE.
      */
     suspend fun buildProfiles(input: UserInput): Profiles = coroutineScope {
         _statuses.value = initialStatuses()
 
-        // Mark every agent RUNNING up-front so the loader animates simultaneously.
-        parallelAgents.forEach { setState(it.id, AgentState.RUNNING) }
+        val cachedRecommender = input.cachedRecommenderProfile?.takeIf { it.isNotBlank() }
+
+        // Per-agent initial state.
+        if (cachedRecommender != null) {
+            setState(recommenderAgent.id, AgentState.DONE)
+        } else {
+            setState(recommenderAgent.id, AgentState.RUNNING)
+        }
+        setState(studentAgent.id, AgentState.RUNNING)
+        setState(targetAgent.id, AgentState.RUNNING)
+        setState(institutionAgent.id, AgentState.RUNNING)
         setState(overlapAgent.id, AgentState.IDLE)
 
-        val deferreds = parallelAgents.map { agent ->
-            async {
-                runCatching { agent.run(input) }
-                    .onSuccess { setState(agent.id, AgentState.DONE) }
-                    .onFailure { setState(agent.id, AgentState.FAILED) }
-                    .getOrThrow()
-            }
+        val recommenderDeferred = if (cachedRecommender != null) {
+            async { cachedRecommender }
+        } else {
+            async { runAgent(recommenderAgent, input) }
         }
+        val studentDeferred = async { runAgent(studentAgent, input) }
+        val targetDeferred = async { runAgent(targetAgent, input) }
+        val institutionDeferred = async { runAgent(institutionAgent, input) }
 
-        val recommender = deferreds[0].await()
-        val student     = deferreds[1].await()
-        val target      = deferreds[2].await()
-        val institution = deferreds[3].await()
+        val recommender = recommenderDeferred.await()
+        val student = studentDeferred.await()
+        val target = targetDeferred.await()
+        val institution = institutionDeferred.await()
 
         // 5th synthesizer: cross-reference everything into the overlap.
         setState(overlapAgent.id, AgentState.RUNNING)
@@ -78,6 +87,12 @@ class AgentOrchestrator(
             institutionalContext = institution
         )
     }
+
+    private suspend fun runAgent(agent: ResearchAgent, input: UserInput): String =
+        runCatching { agent.run(input) }
+            .onSuccess { setState(agent.id, AgentState.DONE) }
+            .onFailure { setState(agent.id, AgentState.FAILED) }
+            .getOrThrow()
 
     private fun setState(id: String, state: AgentState) {
         _statuses.update { list ->

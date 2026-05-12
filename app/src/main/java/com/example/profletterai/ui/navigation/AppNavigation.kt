@@ -21,6 +21,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.navigation.NavController
 import androidx.navigation.NavDestination.Companion.hierarchy
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.compose.NavHost
@@ -66,6 +67,15 @@ fun AppNavigation() {
     )
 
     val savedProfessors by profilesViewModel.profiles.collectAsState()
+    val savedLetters by savedViewModel.items.collectAsState()
+
+    fun navigateTab(route: String) {
+        navController.navigate(route) {
+            popUpTo(navController.graph.findStartDestination().id) { saveState = true }
+            launchSingleTop = true
+            restoreState = true
+        }
+    }
 
     Scaffold(
         modifier = Modifier.fillMaxSize(),
@@ -81,13 +91,7 @@ fun AppNavigation() {
                         ?.any { it.route == tab.route } == true
                     NavigationBarItem(
                         selected = selected,
-                        onClick = {
-                            navController.navigate(tab.route) {
-                                popUpTo(navController.graph.findStartDestination().id) { saveState = true }
-                                launchSingleTop = true
-                                restoreState = true
-                            }
-                        },
+                        onClick = { navigateTab(tab.route) },
                         icon = { Icon(tab.icon, contentDescription = tab.label) },
                         label = { Text(tab.label) },
                         colors = NavigationBarItemDefaults.colors(
@@ -108,7 +112,10 @@ fun AppNavigation() {
             composable(Tab.Generate.route) {
                 GenerateScreen(
                     viewModel = generationViewModel,
-                    savedProfessors = savedProfessors
+                    savedProfessors = savedProfessors,
+                    savedLettersCount = savedLetters.size,
+                    onNavigateToProfiles = { navigateTab(Tab.Profiles.route) },
+                    onNavigateToSaved = { navigateTab(Tab.Saved.route) }
                 )
             }
             composable(Tab.Saved.route) {
@@ -123,8 +130,11 @@ fun AppNavigation() {
             composable(Tab.Profiles.route) {
                 ProfilesScreen(
                     profiles = profilesViewModel.profiles,
+                    isEnriching = profilesViewModel.isEnriching,
+                    enrichmentError = profilesViewModel.enrichmentError,
                     onSave = profilesViewModel::upsert,
-                    onDelete = profilesViewModel::delete
+                    onDelete = profilesViewModel::delete,
+                    onDismissError = profilesViewModel::clearError
                 )
             }
         }

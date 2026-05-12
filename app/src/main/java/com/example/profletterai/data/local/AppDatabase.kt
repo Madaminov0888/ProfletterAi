@@ -9,7 +9,7 @@ import com.example.profletterai.data.model.SavedRecommendation
 
 @Database(
     entities = [SavedRecommendation::class, ProfessorProfile::class],
-    version = 1,
+    version = 2,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -25,7 +25,13 @@ abstract class AppDatabase : RoomDatabase() {
                     context.applicationContext,
                     AppDatabase::class.java,
                     "profletter.db"
-                ).build().also { instance = it }
+                )
+                    // v1 → v2 added `enrichedProfile` and `researchField` columns. For this
+                    // university-scope project we destructively rebuild rather than ship a
+                    // hand-written migration; users can re-enter profiles after upgrading.
+                    .fallbackToDestructiveMigration(true)
+                    .build()
+                    .also { instance = it }
             }
         }
     }

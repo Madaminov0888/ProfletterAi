@@ -29,6 +29,9 @@ import com.example.profletterai.ui.viewmodel.GenerationViewModel
 fun GenerateScreen(
     viewModel: GenerationViewModel,
     savedProfessors: List<ProfessorProfile>,
+    savedLettersCount: Int,
+    onNavigateToProfiles: () -> Unit,
+    onNavigateToSaved: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     val state by viewModel.state.collectAsState()
@@ -64,6 +67,9 @@ fun GenerateScreen(
             AppStep.INPUT_DATA -> InputFormScreen(
                 initial = state.userInput,
                 savedProfessors = savedProfessors,
+                savedLettersCount = savedLettersCount,
+                onNavigateToProfiles = onNavigateToProfiles,
+                onNavigateToSaved = onNavigateToSaved,
                 onSubmit = viewModel::submitInput
             )
             AppStep.BUILDING_PROFILES -> AgentLoader(
@@ -98,9 +104,12 @@ fun GenerateScreen(
             AppStep.FINAL_DRAFT -> DraftScreen(
                 draft = state.draft,
                 savedRecommendationId = state.savedRecommendationId,
+                studentName = state.userInput?.studentName.orEmpty(),
                 onDraftChange = viewModel::updateDraft,
                 onSave = viewModel::saveCurrentDraft,
-                onReset = viewModel::reset
+                onReset = viewModel::reset,
+                onNavigateToSaved = onNavigateToSaved,
+                onNavigateToProfiles = onNavigateToProfiles
             )
         }
     }

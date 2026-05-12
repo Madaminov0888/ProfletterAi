@@ -23,6 +23,8 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Description
+import androidx.compose.material.icons.filled.PictureAsPdf
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -43,7 +45,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.foundation.layout.size
 import com.example.profletterai.data.model.SavedRecommendation
+import com.example.profletterai.service.export.LetterExporter
 import com.example.profletterai.ui.components.MarkdownText
 import com.example.profletterai.ui.theme.Indigo600
 import java.text.DateFormat
@@ -200,11 +204,46 @@ private fun SavedDetailView(
         )
         Spacer(Modifier.height(8.dp))
 
+        val exporter = remember(context) { LetterExporter(context) }
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             OutlinedButton(
                 onClick = { copyToClipboard(context, item.draftMarkdown) },
                 shape = RoundedCornerShape(10.dp)
             ) { Text("Copy letter") }
+            OutlinedButton(
+                onClick = {
+                    runCatching {
+                        val title = "Recommendation Letter — ${item.studentName}"
+                        val out = exporter.exportAndShare(title, item.draftMarkdown, LetterExporter.Format.DOCX)
+                        Toast.makeText(context, "Saved to Downloads: ${out.displayName}", Toast.LENGTH_SHORT).show()
+                        exporter.share(out)
+                    }.onFailure {
+                        Toast.makeText(context, "Export failed: ${it.message}", Toast.LENGTH_LONG).show()
+                    }
+                },
+                shape = RoundedCornerShape(10.dp)
+            ) {
+                Icon(Icons.Filled.Description, contentDescription = null, modifier = Modifier.size(16.dp))
+                Spacer(Modifier.size(6.dp))
+                Text(".docx")
+            }
+            OutlinedButton(
+                onClick = {
+                    runCatching {
+                        val title = "Recommendation Letter — ${item.studentName}"
+                        val out = exporter.exportAndShare(title, item.draftMarkdown, LetterExporter.Format.PDF)
+                        Toast.makeText(context, "Saved to Downloads: ${out.displayName}", Toast.LENGTH_SHORT).show()
+                        exporter.share(out)
+                    }.onFailure {
+                        Toast.makeText(context, "Export failed: ${it.message}", Toast.LENGTH_LONG).show()
+                    }
+                },
+                shape = RoundedCornerShape(10.dp)
+            ) {
+                Icon(Icons.Filled.PictureAsPdf, contentDescription = null, modifier = Modifier.size(16.dp))
+                Spacer(Modifier.size(6.dp))
+                Text(".pdf")
+            }
         }
 
         Spacer(Modifier.height(12.dp))
